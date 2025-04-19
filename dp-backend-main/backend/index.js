@@ -9,19 +9,24 @@ const blacklist = [];
 const cuentas = [
   {
     id: '1',
+    userId: '1', // Nuevo campo para asociar cuenta a usuario
     saldo: 5000,
     transacciones: [
-      { id: '1', tipo: 'depósito', monto: 1000, fecha: '2025-04-01' },
-      { id: '2', tipo: 'retiro', monto: 500, fecha: '2025-04-02' },
-      { id: '3', tipo: 'depósito', monto: 1500, fecha: '2025-04-03' },
-      { id: '4', tipo: 'retiro', monto: 200, fecha: '2025-04-04' },
-      { id: '5', tipo: 'depósito', monto: 800, fecha: '2025-04-05' }
+      { id: '1', tipo: 'depósito', monto: 1000, fecha: '2025-04-01', detalle: 'Depósito inicial', origen: 'Efectivo' },
+      { id: '2', tipo: 'retiro', monto: 500, fecha: '2025-04-02', detalle: 'Retiro cajero', origen: 'ATM' }
     ]
   }
 ];
 const tarjetas = [
-  { id: '1', cuentaId: '1', tipo: 'Débito', numero: '1234-5678-9876-5432', vencimiento: '12/25' },
-  { id: '2', cuentaId: '1', tipo: 'Crédito', numero: '2345-6789-8765-4321', vencimiento: '11/24' }
+  { 
+    id: '1', 
+    cuentaId: '1', 
+    tipo: 'Débito', 
+    numero: '1234567898765432', // Sin guiones para mejor manejo
+    vencimiento: '12/25',
+    nombreTitular: 'Titular Ejemplo',
+    codigoSeguridad: '123'
+  }
 ];
 
 const app = express();
@@ -70,7 +75,7 @@ const verificarToken = (req, res, next) => {
   });
 };
 
-// Endpoints de autenticación
+// Endpoints de autenticación (se mantienen igual)
 app.post('/registro', async (req, res) => {
   try {
     const { id, nyap, dni, email, telefono, contraseña } = req.body;
@@ -94,7 +99,6 @@ app.post('/registro', async (req, res) => {
     };
 
     usuarios.push(usuario);
-
     return res.status(200).json({
       mensaje: 'Usuario registrado OK',
       usuario: { id, nyap, dni, email, telefono, cvu, alias }
@@ -151,162 +155,188 @@ app.get('/perfil', verificarToken, (req, res) => {
 });
 
 // Endpoints de cuentas
-app.get('/accounts/:id', (req, res) => {
+app.get('/accounts/:id', verificarToken, (req, res) => {
   const { id } = req.params;
-  const cuenta = cuentas.find(c => c.id === id);
+  const userId = req.user.id;
 
+  const cuenta = cuentas.find(c => c.id === id && c.userId === userId);
   if (!cuenta) {
     return res.status(404).json({ error: 'Cuenta no encontrada' });
   }
 
   res.status(200).json({
-    saldo: cuenta.saldo
+    saldo: cuenta.saldo,
+    cvu: cuenta.cvu,
+    alias: cuenta.alias
   });
 });
 
-app.get('/accounts/:id/transactions', (req, res) => {
+// Endpoints de transacciones
+app.get('/accounts/:id/transactions', verificarToken, (req, res) => {
   const { id } = req.params;
-  const cuenta = cuentas.find(c => c.id === id);
+  const userId = req.user.id;
 
+  const cuenta = cuentas.find(c => c.id === id && c.userId === userId);
   if (!cuenta) {
     return res.status(404).json({ error: 'Cuenta no encontrada' });
   }
 
-  const ultimosMovimientos = cuenta.transacciones.slice(-5);
   res.status(200).json({
-    transacciones: ultimosMovimientos
+    transacciones: cuenta.transacciones.slice(-5)
   });
 });
 
-// NUEVO ENDPOINT - Actividad de la cuenta
+// Endpoint para toda la actividad
 app.get('/accounts/:id/activity', verificarToken, (req, res) => {
-  try {
-    const { id } = req.params;
-    const userId = req.user.id;
+  const { id } = req.params;
+  const userId = req.user.id;
 
-    // Verificar que la cuenta pertenece al usuario
-    const usuario = usuarios.find(u => u.id === userId);
-    if (!usuario) {
-      return res.status(403).json({ error: 'No tienes permisos para esta cuenta' });
-    }
-
-    const cuenta = cuentas.find(c => c.id === id);
-    if (!cuenta) {
-      return res.status(404).json({ error: 'Cuenta no encontrada' });
-    }
-
-    // Ordenar transacciones por fecha (más reciente primero)
-    const actividadOrdenada = [...cuenta.transacciones].sort((a, b) => {
-      return new Date(b.fecha) - new Date(a.fecha);
-    });
-
-    res.status(200).json(actividadOrdenada);
-  } catch (error) {
-    console.error(error);
-    res.status(400).json({ error: 'Error al obtener la actividad' });
+  const cuenta = cuentas.find(c => c.id === id && c.userId === userId);
+  if (!cuenta) {
+    return res.status(404).json({ error: 'Cuenta no encontrada' });
   }
+
+  const actividadOrdenada = [...cuenta.transacciones].sort((a, b) => 
+    new Date(b.fecha) - new Date(a.fecha)
+  );
+
+  res.status(200).json(actividadOrdenada);
 });
 
-// Endpoints de usuarios
-app.get('/users/:id', (req, res) => {
-  const { id } = req.params;
-  const usuario = usuarios.find(u => u.id === id);
+// Endpoint para detalle de transacción
+app.get('/accounts/:id/activity/:transactionId', verificarToken, (req, res) => {
+  const { id, transactionId } = req.params;
+  const userId = req.user.id;
 
-  if (!usuario) {
-    return res.status(404).json({ error: 'Usuario no encontrado' });
+  const cuenta = cuentas.find(c => c.id === id && c.userId === userId);
+  if (!cuenta) {
+    return res.status(404).json({ error: 'Cuenta no encontrada' });
   }
 
-  res.status(200).json({
-    id: usuario.id,
-    nyap: usuario.nyap,
-    dni: usuario.dni,
-    email: usuario.email,
-    telefono: usuario.telefono,
-    cvu: usuario.cvu,
-    alias: usuario.alias
+  const transaccion = cuenta.transacciones.find(t => t.id === transactionId);
+  if (!transaccion) {
+    return res.status(404).json({ error: 'Transacción no encontrada' });
+  }
+
+  res.status(200).json(transaccion);
+});
+
+// CRUD de Tarjetas (Nuevo)
+app.get('/cards', verificarToken, (req, res) => {
+  const userId = req.user.id;
+  
+  const tarjetasUsuario = tarjetas.filter(t => {
+    const cuenta = cuentas.find(c => c.id === t.cuentaId);
+    return cuenta && cuenta.userId === userId;
   });
+
+  // Ocultar datos sensibles
+  const tarjetasSeguras = tarjetasUsuario.map(t => ({
+    ...t,
+    numero: `•••• •••• •••• ${t.numero.slice(-4)}`,
+    codigoSeguridad: '•••'
+  }));
+
+  res.status(200).json(tarjetasSeguras);
 });
 
-app.patch('/users/:id', (req, res) => {
+app.post('/accounts/:id/cards', verificarToken, (req, res) => {
   const { id } = req.params;
-  const { nyap, dni, email, telefono } = req.body;
-  const usuario = usuarios.find(u => u.id === id);
+  const userId = req.user.id;
+  const { tipo, numero, vencimiento, nombreTitular, codigoSeguridad } = req.body;
 
-  if (!usuario) {
-    return res.status(404).json({ error: 'Usuario no encontrado' });
-  }
-
-  if (nyap) usuario.nyap = nyap;
-  if (dni) usuario.dni = dni;
-  if (email) usuario.email = email;
-  if (telefono) usuario.telefono = telefono;
-
-  res.status(200).json({
-    mensaje: 'Datos de usuario actualizados',
-    usuario
-  });
-});
-
-// Endpoints de tarjetas
-app.get('/accounts/:id/cards', (req, res) => {
-  const { id } = req.params;
-  const tarjetasUsuario = tarjetas.filter(t => t.cuentaId === id);
-  res.status(200).json(tarjetasUsuario);
-});
-
-app.get('/accounts/:accountId/cards/:cardId', (req, res) => {
-  const { accountId, cardId } = req.params;
-  const tarjeta = tarjetas.find(t => t.cuentaId === accountId && t.id === cardId);
-
-  if (!tarjeta) {
-    return res.status(500).json({ error: 'Tarjeta no encontrada' });
-  }
-
-  res.status(200).json(tarjeta);
-});
-
-app.post('/accounts/:id/cards', (req, res) => {
-  const { id } = req.params;
-  const { tipo, numero, vencimiento } = req.body;
-
-  if (!tipo || !numero || !vencimiento) {
+  // Validaciones
+  if (!tipo || !numero || !vencimiento || !nombreTitular || !codigoSeguridad) {
     return res.status(400).json({ error: 'Faltan campos obligatorios' });
   }
 
-  const tarjetaExistente = tarjetas.find(t => t.numero === numero);
-
-  if (tarjetaExistente) {
-    return res.status(409).json({ error: 'La tarjeta ya está asociada a otra cuenta' });
+  if (!['Débito', 'Crédito'].includes(tipo)) {
+    return res.status(400).json({ error: 'Tipo de tarjeta inválido' });
   }
 
+  // Verificar cuenta
+  const cuenta = cuentas.find(c => c.id === id && c.userId === userId);
+  if (!cuenta) {
+    return res.status(404).json({ error: 'Cuenta no encontrada' });
+  }
+
+  // Crear tarjeta
   const nuevaTarjeta = {
     id: (tarjetas.length + 1).toString(),
     cuentaId: id,
     tipo,
-    numero,
-    vencimiento
+    numero: numero.replace(/\s+/g, ''), // Eliminar espacios
+    vencimiento,
+    nombreTitular,
+    codigoSeguridad,
+    fechaCreacion: new Date().toISOString()
   };
 
   tarjetas.push(nuevaTarjeta);
   res.status(201).json({
     mensaje: 'Tarjeta agregada correctamente',
-    tarjeta: nuevaTarjeta
+    tarjeta: {
+      ...nuevaTarjeta,
+      numero: `•••• •••• •••• ${nuevaTarjeta.numero.slice(-4)}`,
+      codigoSeguridad: '•••'
+    }
   });
 });
 
-app.delete('/accounts/:accountId/cards/:cardId', (req, res) => {
-  const { accountId, cardId } = req.params;
-  const tarjetaIndex = tarjetas.findIndex(t => t.cuentaId === accountId && t.id === cardId);
+// Endpoint para ingresos desde tarjeta (Nuevo)
+app.post('/accounts/:id/transferences', verificarToken, (req, res) => {
+  const { id } = req.params;
+  const userId = req.user.id;
+  const { monto, tarjetaId, descripcion } = req.body;
 
-  if (tarjetaIndex === -1) {
+  // Validaciones
+  if (!monto || !tarjetaId) {
+    return res.status(400).json({ error: 'Faltan campos obligatorios' });
+  }
+
+  if (isNaN(monto) || monto <= 0) {
+    return res.status(400).json({ error: 'Monto inválido' });
+  }
+
+  // Verificar cuenta y permisos
+  const cuenta = cuentas.find(c => c.id === id && c.userId === userId);
+  if (!cuenta) {
+    return res.status(404).json({ error: 'Cuenta no encontrada' });
+  }
+
+  // Verificar tarjeta
+  const tarjeta = tarjetas.find(t => t.id === tarjetaId && t.cuentaId === id);
+  if (!tarjeta) {
     return res.status(404).json({ error: 'Tarjeta no encontrada' });
   }
 
-  tarjetas.splice(tarjetaIndex, 1);
-  res.status(200).json({ mensaje: 'Tarjeta eliminada correctamente' });
+  // Crear transacción
+  const nuevaTransaccion = {
+    id: (cuenta.transacciones.length + 1).toString(),
+    tipo: 'depósito',
+    monto: parseFloat(monto),
+    fecha: new Date().toISOString(),
+    detalle: descripcion || `Ingreso desde tarjeta ${tarjeta.tipo}`,
+    origen: `Tarjeta ${tarjeta.tipo} (••••${tarjeta.numero.slice(-4)})`,
+    estado: 'Completado'
+  };
+
+  // Actualizar saldo
+  cuenta.saldo += nuevaTransaccion.monto;
+  cuenta.transacciones.push(nuevaTransaccion);
+
+  res.status(201).json({
+    mensaje: 'Ingreso registrado correctamente',
+    transaccion: nuevaTransaccion,
+    saldoActual: cuenta.saldo
+  });
 });
 
 // Iniciar servidor
 app.listen(PORT, () => {
   console.log(`Servidor corriendo en http://localhost:${PORT}`);
+  console.log(`Datos iniciales:`);
+  console.log(`- Usuario demo: ID 1`);
+  console.log(`- Cuenta demo: ID 1 con saldo $${cuentas[0].saldo}`);
+  console.log(`- Tarjeta demo: ID 1 terminada en ${tarjetas[0].numero.slice(-4)}`);
 });
