@@ -80,15 +80,16 @@ const Login = () => {
     setIsSubmiting(true);
     login(email, password)
       .then((response) => {
-        setToken(response.accessToken);
+        console.log("Respuesta del login:", response);
+        setToken(response.token); 
+
         setTimeout(() => {
           setIsSubmiting(false);
           setIsAuthenticated(true);
-        });
+        }, 1000);
       })
       .catch((error) => {
-        // eslint-disable-next-line no-console
-        console.log(error);
+        console.error(error);
         setIsSubmiting(false);
         setMessage(ERROR_MESSAGES.NOT_FOUND_USER);
         if (error.status === BAD_REQUEST) {
@@ -111,9 +112,7 @@ const Login = () => {
       >
         <div>
           <FormControl variant="outlined">
-            <InputLabel htmlFor="outlined-adornment-password">
-              Correo
-            </InputLabel>
+            <InputLabel htmlFor="outlined-adornment-password">Correo</InputLabel>
             <OutlinedInput
               id="outlined-adornment-email"
               type="text"
@@ -128,9 +127,7 @@ const Login = () => {
         </div>
         <div>
           <FormControl variant="outlined">
-            <InputLabel htmlFor="outlined-adornment-password">
-              Contraseña
-            </InputLabel>
+            <InputLabel htmlFor="outlined-adornment-password">Contraseña</InputLabel>
             <OutlinedInput
               id="outlined-adornment-password"
               type={values.showPassword ? 'text' : 'password'}

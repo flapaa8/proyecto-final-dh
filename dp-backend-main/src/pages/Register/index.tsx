@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { useForm, SubmitHandler } from 'react-hook-form';
 import Button from '@mui/material/Button';
 import FormControl from '@mui/material/FormControl';
@@ -14,7 +14,7 @@ import {
   emailValidationConfig,
   passwordValidationConfig,
   nameValidationConfig,
-  phoneValidationConfig,
+  phoneValidationConfig, 
   dniValidationConfig,
   handleChange,
   createAnUser,
@@ -50,6 +50,10 @@ interface RegisterInputs {
   passwordRepeated: string;
 }
 
+interface CreateUserResponse {
+  accessToken?: string;
+}
+
 const messageDuration = 2000;
 
 const Register = () => {
@@ -62,7 +66,6 @@ const Register = () => {
     criteriaMode: 'all',
   });
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [token, setToken] = useLocalStorage('token');
   const { setIsAuthenticated } = useAuth();
 
@@ -76,13 +79,28 @@ const Register = () => {
     passwordRepeated: '',
     showPassword: false,
   });
-  const [isSuccess, setIsSuccess] = useState<boolean>(false);
-  const [isError, setIsError] = useState<boolean>(false);
-  const [isSubmiting, setIsSubmiting] = useState<boolean>(false);
-  const [message, setMessage] = useState<string>('');
+
+  const [isSuccess, setIsSuccess] = useState(false);
+  const [isError, setIsError] = useState(false);
+  const [isSubmiting, setIsSubmiting] = useState(false);
+  const [message, setMessage] = useState('');
 
   const isEmpty = isValueEmpty(values);
   const hasErrors = useMemo(() => valuesHaveErrors(errors), [errors]);
+
+
+  const onChange = (
+    event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
+    maxLength?: number
+  ) => {
+    console.log('Valores cambiados:', event.target.name, event.target.value); 
+    handleChange<RegisterState>(event, setValues, maxLength);
+  };
+
+ 
+  useEffect(() => {
+    console.log('Estado de los valores:', values);
+  }, [values]);
 
   const handleClickShowPassword = () => {
     setValues({
@@ -91,18 +109,11 @@ const Register = () => {
     });
   };
 
-  const handleMouseDownPassword = (
-    event: React.MouseEvent<HTMLButtonElement>
-  ) => {
+  const handleMouseDownPassword = (event: React.MouseEvent<HTMLButtonElement>) => {
     event.preventDefault();
   };
 
-  const onChange = (
-    event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
-    maxLength?: number
-  ) => handleChange<RegisterState>(event, setValues, maxLength);
-
-  const onSubmit: SubmitHandler<RegisterInputs> = ({
+  const onSubmit: SubmitHandler<RegisterInputs> = async ({
     name,
     lastName,
     password,
@@ -111,32 +122,55 @@ const Register = () => {
     email,
   }) => {
     setIsSubmiting(true);
-    createAnUser({
-      firstName: name,
-      lastName,
-      password,
-      phone,
-      dni,
-      email,
-    })
-      .then((response) => {
+
+    console.log('Datos enviados al backend:', { name, lastName, password, phone, dni, email }); 
+
+    if (!createAnUser) {
+      console.error('createAnUser no está disponible');
+      setIsSubmiting(false);
+      setIsError(true);
+      setMessage('Error interno. Intenta más tarde.');
+      return;
+    }
+
+    try {
+      const response = await createAnUser({
+        firstName: name,
+        lastName,
+        password,
+        phone,
+        dni,
+        email,
+      });
+
+      if (!response) {
+        throw new Error('No se pudo crear el usuario.');
+      }
+
+      const { accessToken } = response;
+
+      if (accessToken) {
         setIsSuccess(true);
-        setToken(response.accessToken);
+        setToken(accessToken);
         setMessage(SUCCESS_MESSAGES[SUCCESS_MESSAGES_KEYS.USER_REGISTER]);
         setTimeout(() => {
           setIsSubmiting(false);
           setIsAuthenticated(true);
         }, messageDuration);
-      })
-      .catch((error) => {
-        console.log(error);
+      } else {
         setIsError(true);
         setMessage(ERROR_MESSAGES.INVALID_USER);
         setIsSubmiting(false);
-        if (error.status === BAD_REQUEST) {
-          setIsError(true);
-        }
-      });
+      }
+    } catch (error: any) {
+      console.log(error);
+      setIsError(true);
+      setMessage(ERROR_MESSAGES.INVALID_USER);
+      setIsSubmiting(false);
+      if (error?.status === BAD_REQUEST) {
+        setIsError(true);
+      }
+    }
   };
 
   return (
@@ -149,9 +183,7 @@ const Register = () => {
         >
           <div>
             <FormControl variant="outlined">
-              <InputLabel htmlFor="outlined-adornment-password">
-                Nombre
-              </InputLabel>
+              <InputLabel htmlFor="outlined-adornment-name">Nombre</InputLabel>
               <OutlinedInput
                 id="outlined-adornment-name"
                 type="text"
@@ -165,9 +197,7 @@ const Register = () => {
           </div>
           <div>
             <FormControl variant="outlined">
-              <InputLabel htmlFor="outlined-adornment-password">
-                Apellido
-              </InputLabel>
+              <InputLabel htmlFor="outlined-adornment-last-name">Apellido</InputLabel>
               <OutlinedInput
                 id="outlined-adornment-last-name"
                 type="text"
@@ -177,9 +207,7 @@ const Register = () => {
                 label="lastName"
               />
             </FormControl>
-            {errors.lastName && (
-              <ErrorMessage errors={errors.lastName as Errors} />
-            )}
+            {errors.lastName && <ErrorMessage errors={errors.lastName as Errors} />}
           </div>
           <div>
             <FormControl variant="outlined">
@@ -196,12 +224,9 @@ const Register = () => {
             </FormControl>
             {errors.dni && <ErrorMessage errors={errors.dni as Errors} />}
           </div>
-
           <div>
             <FormControl variant="outlined">
-              <InputLabel htmlFor="outlined-adornment-password">
-                Correo
-              </InputLabel>
+              <InputLabel htmlFor="outlined-adornment-email">Correo</InputLabel>
               <OutlinedInput
                 id="outlined-adornment-email"
                 type="text"
@@ -215,9 +240,7 @@ const Register = () => {
           </div>
           <div>
             <FormControl variant="outlined">
-              <InputLabel htmlFor="outlined-adornment-password">
-                Contraseña
-              </InputLabel>
+              <InputLabel htmlFor="outlined-adornment-password">Contraseña</InputLabel>
               <OutlinedInput
                 id="outlined-adornment-password"
                 type={values.showPassword ? 'text' : 'password'}
@@ -231,7 +254,6 @@ const Register = () => {
                       onClick={handleClickShowPassword}
                       onMouseDown={handleMouseDownPassword}
                       edge="end"
-                      className="tw-text-neutral-gray-100"
                     >
                       {values.showPassword ? <VisibilityOff /> : <Visibility />}
                     </IconButton>
@@ -241,16 +263,11 @@ const Register = () => {
                 autoComplete="off"
               />
             </FormControl>
-            {errors.password && (
-              <ErrorMessage errors={errors.password as Errors} />
-            )}
+            {errors.password && <ErrorMessage errors={errors.password as Errors} />}
           </div>
-
           <div>
             <FormControl variant="outlined">
-              <InputLabel htmlFor="outlined-adornment-password-repeated">
-                Confirmar contraseña
-              </InputLabel>
+              <InputLabel htmlFor="outlined-adornment-password-repeated">Confirmar contraseña</InputLabel>
               <OutlinedInput
                 id="outlined-adornment-password-repeated"
                 type={values.showPassword ? 'text' : 'password'}
@@ -270,7 +287,6 @@ const Register = () => {
                       onClick={handleClickShowPassword}
                       onMouseDown={handleMouseDownPassword}
                       edge="end"
-                      className="tw-text-neutral-gray-100"
                     >
                       {values.showPassword ? <VisibilityOff /> : <Visibility />}
                     </IconButton>
@@ -280,19 +296,18 @@ const Register = () => {
                 autoComplete="off"
               />
             </FormControl>
-            {errors.password && (
+            {errors.passwordRepeated && (
               <ErrorMessage errors={errors.passwordRepeated as Errors} />
             )}
           </div>
-
           <div>
             <FormControl variant="outlined">
-              <InputLabel htmlFor="outlined-adornment-dni">Télefono</InputLabel>
+              <InputLabel htmlFor="outlined-adornment-phone">Teléfono</InputLabel>
               <OutlinedInput
                 id="outlined-adornment-phone"
                 type="number"
                 value={values.phone}
-                {...register('phone', phoneValidationConfig)}
+                {...register('phone', phoneValidationConfig)} 
                 onChange={onChange}
                 label="phone"
               />
@@ -304,26 +319,27 @@ const Register = () => {
               className={`tw-h-14 tw-w-80 ${
                 hasErrors || !isDirty || isEmpty || isSubmiting
                   ? 'tw-text-neutral-gray-300 tw-border-neutral-gray-300 tw-cursor-not-allowed'
-                  : ''
+                  : 'tw-text-white tw-border-primary tw-bg-primary'
               }`}
-              type="submit"
               variant="outlined"
+              type="submit"
               disabled={hasErrors || !isDirty || isEmpty || isSubmiting}
             >
-              Ingresar
+              Crear cuenta
             </Button>
           </div>
         </form>
       </div>
-      {message.length > 0 && (
-        <SnackBar
-          duration={messageDuration}
-          message={message}
-          type={isSuccess ? 'success' : isError ? 'error' : 'primary'}
-        />
-      )}
+
+      <SnackBar
+        duration={messageDuration}
+        message={message}
+        type={isError ? 'error' : 'success'}
+      />
     </div>
   );
 };
 
 export default Register;
+
+

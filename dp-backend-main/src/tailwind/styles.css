@@ -852,6 +852,10 @@ label {
   border-color: var(--neutral-gray-300);
 }
 
+#root .tw-border-primary {
+  border-color: var(--primary);
+}
+
 #root .tw-bg-background {
   background-color: var(--background);
 }

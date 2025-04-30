@@ -40,25 +40,67 @@ export const login = (email: string, password: string) => {
     });
 };
 
+const generarID = () => Math.floor(Math.random() * 1000000); 
+
 export const createAnUser = (user: User) => {
-  return fetch(myRequest(`${baseUrl}/register`, 'POST'), {
-    body: JSON.stringify(user),
+  console.log('Voy a enviar este user:', user);
+
+  if (!user.firstName || !user.lastName) {
+    console.error('Los campos firstName y lastName son obligatorios.');
+    return Promise.reject(new Error('Nombre y apellido obligatorios.'));
+  }
+
+  const userForBackend = {
+    id: generarID(),
+    NyAP: `${user.firstName} ${user.lastName}`,
+    dni: user.dni,
+    email: user.email,
+    telefono: user.phone,
+    password: user.password, 
+  };
+
+  console.log('Enviando al backend:', userForBackend);
+
+  return fetch(`${baseUrl}/register`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(userForBackend),
   })
     .then((response) => {
-      if (response.ok) {
-        return response.json();
+      if (!response.ok) {
+        console.error('Error en la solicitud:', response.statusText);
+        return rejectPromise(response);
       }
-      return rejectPromise(response);
+      return response.json();
     })
     .then((data) => {
-      createAnAccount(data);
+      console.log('USER DATA', data);
+  
+      if (
+        data.usuario &&
+        data.accessToken &&
+        typeof data.usuario.nyap === 'string'
+      ) {
+        const [firstName, ...lastNameParts] = data.usuario.nyap.split(' ');
+        createAnAccount({
+          user: {
+            ...data.usuario,
+            firstName,
+            lastName: lastNameParts.join(' '),
+          },
+          accessToken: data.accessToken,
+        });
+      }
+  
       return data;
     })
-    .catch((err) => {
-      console.log(err);
-      return rejectPromise(err);
+    .catch((error) => {
+      console.error('Error al registrar el usuario:', error);
+      throw error; // para que el `try/catch` del frontend lo atrape
     });
-};
+  }  
 
 export const getUser = (id: string): Promise<User> => {
   return fetch(myRequest(`${baseUrl}/users/${id}`, 'GET'))
@@ -140,6 +182,8 @@ export const createAnAccount = (data: any): Promise<Response> => {
     name: `${user.firstName} ${user.lastName}`,
   };
 
+  console.log('Creando cuenta con estos datos:', account);
+
   return fetch(
     myRequest(`${baseUrl}/users/${user.id}/accounts`, 'POST', accessToken),
     {
@@ -147,8 +191,17 @@ export const createAnAccount = (data: any): Promise<Response> => {
     }
   ).then((response) =>
     response.ok ? response.json() : rejectPromise(response)
-  );
+  )
+  .then((accountData) => {
+    console.log('Cuenta creada:', accountData); 
+    return accountData;
+  })
+  .catch((err) => {
+    console.error('Error al crear la cuenta:', err);
+    return rejectPromise(err);
+  });
 };
+
 
 export const getAccount = (id: string, token: string): Promise<UserAccount> => {
   return fetch(myRequest(`${baseUrl}/users/${id}/accounts`, 'GET', token), {})

@@ -23,57 +23,45 @@ function App() {
   const { isAuthenticated } = useAuth();
 
   return (
-    <>
-      <BrowserRouter>
-        <Layout isAuthenticated={isAuthenticated}>
-          <Suspense
-            fallback={
-              <div className="tw-w-full tw-h-full tw-flex tw-flex-col tw-items-center tw-justify-center">
-                <CircularProgress />
-              </div>
-            }
-          >
-            <Routes>
-              <React.Fragment></React.Fragment>
-              <Route path={ROUTES.HOME} element={<PrivateRoutes />}>
-                <Route element={<Dashboard />} path={ROUTES.HOME} />
-                <Route element={<Activity />} path={`${ROUTES.ACTIVITY}`} />
-                <Route element={<Cards />} path={ROUTES.CARDS} />
-                <Route element={<SendMoney />} path={ROUTES.SEND_MONEY} />
-                <Route element={<LoadMoney />} path={ROUTES.LOAD_MONEY} />
-                <Route element={<Profile />} path={ROUTES.PROFILE} />
-                <Route
-                  element={<ActivityDetails />}
-                  path={ROUTES.ACTIVITY_DETAILS}
-                />
-              </Route>
-              <Route
-                element={
-                  isAuthenticated ? (
-                    <Navigate replace to={ROUTES.HOME} />
-                  ) : (
-                    <Login />
-                  )
-                }
-                path={ROUTES.LOGIN}
-              />
-              <Route
-                element={
-                  isAuthenticated ? (
-                    <Navigate replace to={ROUTES.HOME} />
-                  ) : (
-                    <Register />
-                  )
-                }
-                path={ROUTES.REGISTER}
-              />
-              <Route element={<PageNotFound />} path="*" />
-            </Routes>
-          </Suspense>
-        </Layout>
-      </BrowserRouter>
-    </>
+    <BrowserRouter>
+      <Layout isAuthenticated={isAuthenticated}>
+        <Suspense
+          fallback={
+            <div className="tw-w-full tw-h-full tw-flex tw-flex-col tw-items-center tw-justify-center">
+              <CircularProgress />
+            </div>
+          }
+        >
+          <Routes>
+            <Route path={ROUTES.HOME} element={<PrivateRoutes />}>
+              <Route index element={<Dashboard />} />
+              <Route path={ROUTES.ACTIVITY} element={<Activity />} />
+              <Route path={ROUTES.CARDS} element={<Cards />} />
+              <Route path={ROUTES.SEND_MONEY} element={<SendMoney />} />
+              <Route path={ROUTES.LOAD_MONEY} element={<LoadMoney />} />
+              <Route path={ROUTES.PROFILE} element={<Profile />} />
+              <Route path={ROUTES.ACTIVITY_DETAILS} element={<ActivityDetails />} />
+            </Route>
+
+            <Route
+              path={ROUTES.LOGIN}
+              element={
+                isAuthenticated ? <Navigate to={ROUTES.HOME} replace /> : <Login />
+              }
+            />
+            <Route
+              path={ROUTES.REGISTER}
+              element={
+                isAuthenticated ? <Navigate to={ROUTES.HOME} replace /> : <Register />
+              }
+            />
+            <Route path="*" element={<PageNotFound />} />
+          </Routes>
+        </Suspense>
+      </Layout>
+    </BrowserRouter>
   );
 }
 
 export default App;
+
