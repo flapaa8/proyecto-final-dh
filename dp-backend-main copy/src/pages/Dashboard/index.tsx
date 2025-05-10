@@ -43,7 +43,7 @@ const Dashboard = () => {
   const { logout } = useAuth();
 
   useEffect(() => {
-    if (user && user.id && typeof token === 'string') {  // Verificación de tipo
+    if (user && user.id) {
       getUserActivities(user.id, token)
         .then((activities) => {
           if ((activities as Transaction[]).length > 0) {
@@ -65,7 +65,7 @@ const Dashboard = () => {
   }, [logout, token, user]);
 
   useEffect(() => {
-    if ((user && user.id || (user && user.id && isSuccess)) && typeof token === 'string') {  // Verificación de tipo
+    if ((user && user.id) || (user && user.id && isSuccess)) {
       getAccount(user.id, token)
         .then((account) => {
           if ((account as UserAccount).balance) {
