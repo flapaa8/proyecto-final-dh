@@ -1,4 +1,4 @@
-# Dockerfile (ej: en backend/cards-service/Dockerfile)
+# backend/cards-service/Dockerfile
 
 FROM node:18
 

@@ -1,13 +1,28 @@
-version: '3.9'
+version: '3.8'
 
 services:
-  backend:
-    build: .
-    container_name: backend-app
+  users-service:
+    build:
+      context: ./user-service
     ports:
-      - "3000:3000"
-    volumes:
-      - .:/app
-      - /app/node_modules
-    environment:
-      - NODE_ENV=development
+      - "3500:3500"
+    restart: always
+
+  accounts-service:
+    build:
+      context: ./account-service
+    ports:
+      - "3600:3600"
+    depends_on:
+      - users-service    # Acá estaba mal el nombre
+    restart: always
+
+  cards-service:
+    build:
+      context: ./cards-service
+    ports:
+      - "3602:3602"
+    depends_on:
+      - accounts-service
+    restart: always
+

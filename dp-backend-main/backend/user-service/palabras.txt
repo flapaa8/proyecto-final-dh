@@ -1,0 +1,15 @@
+luz
+sol
+nube
+rio
+mar
+cielo
+arbol
+flor
+piedra
+fuego
+agua
+viento
+estrella
+montaña
+tierra

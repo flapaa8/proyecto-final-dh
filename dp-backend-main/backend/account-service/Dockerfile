@@ -1,4 +1,4 @@
-# Dockerfile (ej: en backend/cards-service/Dockerfile)
+# backend/account-service/Dockerfile
 
 FROM node:18
 
@@ -9,6 +9,6 @@ RUN npm install
 
 COPY . .
 
-EXPOSE 3602
+EXPOSE 3600
 
 CMD ["node", "index.js"]
