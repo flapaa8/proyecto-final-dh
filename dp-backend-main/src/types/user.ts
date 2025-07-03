@@ -5,7 +5,8 @@ export interface User {
   password: string;
   phone?: string;
   dni?: string;
-  id?: string;
+  id: string;
+
 }
 
 export interface UserAccount {

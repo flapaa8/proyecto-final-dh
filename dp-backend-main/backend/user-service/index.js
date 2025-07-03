@@ -5,7 +5,18 @@ import userRoutes from './routes/userRoutes.js';
 const app = express();
 const PORT = 3500;
 
-app.use(cors());
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin || origin.startsWith('http://localhost')) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+}));
+
 app.use(express.json());
 
 // Middleware para loguear todas las peticiones y el body recibido

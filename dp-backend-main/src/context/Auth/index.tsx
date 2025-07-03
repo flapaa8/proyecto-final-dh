@@ -1,40 +1,77 @@
 import React, { createContext, useState, useEffect, SetStateAction } from 'react';
-import { useLocalStorage } from '../../hooks';
+import { useLocalStorage } from '../../hooks/useLocalStorage';
+import { getUser, parseJwt } from '../../utils';
+import { User } from '../../types'; // ✅ Usamos tipado único
 
-// Creación del contexto de autenticación
 export const AuthContext = createContext<{
   isAuthenticated: boolean;
   setIsAuthenticated: React.Dispatch<SetStateAction<boolean>>;
   logout: () => void;
   token: string | null;
   loading: boolean;
+  user: User | null;
+  setUser: React.Dispatch<SetStateAction<User | null>>;
 }>({
   isAuthenticated: false,
   setIsAuthenticated: () => {},
   logout: () => {},
   token: null,
   loading: true,
+  user: null,
+  setUser: () => {},
 });
 
 const AuthProvider = ({ children }: { children: React.ReactNode }) => {
-  // Utilizamos useLocalStorage para guardar y recuperar el token
   const [token, setToken] = useLocalStorage<string | null>('token', {
-    deserialize: (value) => (value ? value : null), // Mejor control en caso de valor no definido
+    deserialize: (value) => (value ? value : null),
+  });
+
+  const [user, setUser] = useLocalStorage<User | null>('user', {
+    deserialize: (value) => (value ? JSON.parse(value) : null),
   });
 
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(!!token);
   const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
-    // Aseguramos que la autenticación esté sincronizada con el token
-    setIsAuthenticated(!!token);
-    setLoading(false);
-  }, [token]);
+    async function fetchUser() {
+      if (token) {
+        try {
+          const parsedToken = parseJwt(token);
+          const userId = parsedToken?.sub;
 
-  // Función de logout que limpia el token y cambia el estado de autenticación
+          if (userId) {
+            const userFromApi = await getUser(userId);
+
+            // ✅ fallback para dni y phone si pueden venir undefined
+            setUser({
+              ...userFromApi,
+              dni: userFromApi.dni ?? '',
+              phone: userFromApi.phone ?? '',
+            });
+            setIsAuthenticated(true);
+          } else {
+            setUser(null);
+            setIsAuthenticated(false);
+          }
+        } catch (error) {
+          setUser(null);
+          setIsAuthenticated(false);
+          setToken(null);
+        }
+      } else {
+        setUser(null);
+        setIsAuthenticated(false);
+      }
+      setLoading(false);
+    }
+    fetchUser();
+  }, [token, setUser, setToken]);
+
   const logout = () => {
     setIsAuthenticated(false);
-    setToken(null); // Remueve el token al hacer logout
+    setToken(null);
+    setUser(null);
   };
 
   return (
@@ -45,6 +82,8 @@ const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         logout,
         token,
         loading,
+        user,
+        setUser,
       }}
     >
       {children}
@@ -53,6 +92,7 @@ const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 };
 
 export default AuthProvider;
+
 
 
 

@@ -1,9 +1,10 @@
 import {
   crearCuentaService,
   obtenerCuentasPorUsuarioService,
+  obtenerActividadesPorUsuarioService,
   agregarTransaccionService,
   obtenerTransaccionesService,
-  transferirFondosService // 👈 Importado junto con los otros
+  transferirFondosService
 } from '../services/accountService.js';
 
 // Crear cuenta
@@ -23,6 +24,17 @@ export async function obtenerCuentasPorUsuarioController(req, res) {
     const userId = req.params.userId;
     const cuentas = await obtenerCuentasPorUsuarioService(userId);
     res.json(cuentas);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+}
+
+// Obtener actividades por usuario
+export async function obtenerActividadesPorUsuarioController(req, res) {
+  try {
+    const userId = req.params.userId;
+    const actividades = await obtenerActividadesPorUsuarioService(userId);
+    res.json(actividades);
   } catch (error) {
     res.status(400).json({ error: error.message });
   }
@@ -56,14 +68,12 @@ export async function transferirFondosController(req, res) {
   try {
     const cuentaOrigenId = req.params.cuentaId;
     const { destino, monto, descripcion } = req.body;
-
     const resultado = await transferirFondosService({
       cuentaOrigenId,
-      destino, // puede ser alias o CVU
+      destino,
       monto,
       descripcion
     });
-
     res.status(200).json({
       mensaje: 'Transferencia realizada con éxito',
       resultado
@@ -72,5 +82,6 @@ export async function transferirFondosController(req, res) {
     res.status(400).json({ error: error.message });
   }
 }
+
 
 

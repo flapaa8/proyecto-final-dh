@@ -45,7 +45,8 @@ const Profile = () => {
   const message = (searchParams.get('message') as SUCCESS_MESSAGES_KEYS) || '';
   const [isError, setIsError] = useState<boolean>(!!searchParams.get('error'));
   const { user } = useUserInfo();
-  const [token, setToken] = useLocalStorage('token');
+  const [token, setToken] = useLocalStorage<string>('token');
+
 
   const [userAccount, setUserAccount] = useState({
     alias: '',
@@ -66,7 +67,7 @@ const Profile = () => {
 
   useEffect(() => {
     if (user && user.id) {
-      getAccount(user.id, token)
+      getAccount(user.id, token ?? '')
         .then((account) => {
           if (account && account.alias && account.cvu) {
             setUserAccount(account);
@@ -91,7 +92,7 @@ const Profile = () => {
 
   const onSubmit: SubmitHandler<IProfile> = (data) => {
     if (user && user.id) {
-      updateAccount(user.id, { alias: data.alias }, token)
+      updateAccount(user.id, { alias: data.alias }, token ?? '')
         .then((response) => {
           if (response.status) {
             setIsError(true);

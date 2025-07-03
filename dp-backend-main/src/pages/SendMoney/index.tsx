@@ -1,349 +1,247 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import {
-  CardCustom,
-  Icon,
-  Records,
-  FormSingle,
-  IRecord,
-  RecordVariant,
-  SnackBar,
-} from '../../components';
-import { currencies, ERROR, ROUTES, STEP, UNAUTHORIZED } from '../../constants';
-import { Link, useSearchParams, useNavigate } from 'react-router-dom';
-import {
-  handleChange,
-  moneyValidationConfig,
-  formatCurrency,
-  getUserActivities,
-  parseRecordContent,
-  calculateTransacionType,
-  getAccounts,
-  getUser,
-  createTransferActivity,
-} from '../../utils';
-import { Button } from '@mui/material';
-import {
-  ActivityType,
-  Transaction,
-  TransactionType,
-  UserAccount,
-  User,
-} from '../../types';
-import { useAuth, useLocalStorage, useUserInfo } from '../../hooks';
+import { UserAccount, User, Transaction, Card } from '../../types';
 
-const SendMoney = () => {
-  const [searchParams] = useSearchParams();
-  const step = searchParams.get('step');
-  const [userActivities, setUserActivities] = useState<Transaction[]>([]);
-  const [userAccounts, setUserAccounts] = useState<IRecord[]>([]);
-  const { logout } = useAuth();
-  const { user } = useUserInfo();
-  const [token] = useLocalStorage('token');
+const USERS_SERVICE_URL = 'http://localhost:3500';
+const ACCOUNTS_SERVICE_URL = 'http://localhost:3600';
+const CARDS_SERVICE_URL = 'http://localhost:3602';
 
-  useEffect(() => {
-    if (user && user.id && !step) {
-      getUserActivities(user.id, token)
-        .then((activities) => {
-          if ((activities as Transaction[]).length > 0) {
-            const parsedActivities = activities.filter(
-              (activity: Transaction) =>
-                activity.type === TransactionType.Transfer
-            );
-            setUserActivities(parsedActivities);
-          }
-        })
-        .catch((error) => {
-          if (error.status === UNAUTHORIZED) {
-            logout();
-          }
-        });
-    }
-  }, [logout, step, token, user]);
-
-  useEffect(() => {
-    if (userActivities.length > 0) {
-      const parsedRecords = userActivities
-        .filter(
-          (activity: Transaction) =>
-            calculateTransacionType(activity.amount, activity.type) ===
-            ActivityType.TRANSFER_IN
-        )
-        .map((activity: Transaction) =>
-          parseRecordContent(
-            { name: activity.name, origin: activity.origin },
-            RecordVariant.ACCOUNT
-          )
-        );
-
-      const uniqueRecords = parsedRecords.filter(
-        (record, index, self) =>
-          index ===
-          self.findIndex(
-            (t) =>
-              (t.content as Transaction).origin ===
-              (record.content as Transaction).origin
-          )
-      );
-
-      setUserAccounts(uniqueRecords);
-    }
-  }, [userActivities]);
-
-  return (
-    <div className="tw-w-full">
-      {step ? (
-        <SendMoneyForm />
-      ) : (
-        <>
-          <CardCustom
-            className="tw-max-w-5xl"
-            content={
-              <div className="tw-flex tw-justify-between tw-mb-4">
-                <p className="tw-font-bold">Elegí a qué cuenta transferir</p>
-              </div>
-            }
-            actions={
-              <Link
-                to={`${ROUTES.SEND_MONEY}?${STEP}1`}
-                className="tw-w-full tw-flex tw-items-center tw-justify-between tw-p-4 hover:tw-bg-neutral-gray-500 tw-transition"
-              >
-                <div className="tw-flex tw-items-center tw-gap-x-4">
-                  <Icon type="add" />
-                  <p>Nueva cuenta</p>
-                </div>
-                <Icon type="arrow-right" />
-              </Link>
-            }
-          />
-          <CardCustom
-            className="tw-max-w-5xl"
-            content={
-              <>
-                <div>
-                  <p className="tw-mb-4 tw-font-bold">Últimas cuentas</p>
-                </div>
-                {userAccounts.length > 0 && <Records records={userAccounts} />}
-                {userAccounts.length === 0 && <p>No hay cuentas registradas</p>}
-              </>
-            }
-          />
-        </>
-      )}
-    </div>
-  );
+const myInit = (method = 'GET', token?: string) => {
+  return {
+    method,
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: token ? `Bearer ${token}` : '',
+    },
+    mode: 'cors' as RequestMode,
+    cache: 'default' as RequestCache,
+  };
 };
 
-export default SendMoney;
+const myRequest = (endpoint: string, method: string, token?: string) =>
+  new Request(endpoint, myInit(method, token));
 
-const duration = 2000;
-
-function SendMoneyForm() {
-  const [searchParams] = useSearchParams();
-  const [destination, setDestination] = useState(
-    searchParams.get('destination')
-  );
-  const step = searchParams.get('step');
-  const [formState, setFormState] = useState({
-    destination: destination || '',
-    amount: '',
+const rejectPromise = (response?: Response): Promise<Response> =>
+  Promise.reject({
+    status: (response && response.status) || '00',
+    statusText: (response && response.statusText) || 'Ocurrió un error',
+    err: true,
   });
-  const [userDestinationAccount, setUserDestinationAccount] =
-    useState<UserAccount>();
-  const [userDestination, setUserDestination] = useState<User>();
-  const [userOriginAccount, setUserOriginAccount] = useState<UserAccount>();
-  const navigate = useNavigate();
-  const { user } = useUserInfo();
-  const [token] = useLocalStorage('token');
 
-  useEffect(() => {
-    if (destination) {
-      // TODO: implement a service to get user account by alias or cvu
-      getAccounts().then((accounts) => {
-        const userAccount = accounts.find(
-          (account) =>
-            account.cvu === destination || account.alias === destination
-        );
-        if (userAccount) {
-          setUserDestinationAccount(userAccount);
-        } else {
-          setDestination(null);
-          navigate(`${ROUTES.SEND_MONEY}?${STEP}1&${ERROR}`);
-        }
-      });
-    }
-  }, [destination, navigate]);
+export const login = (email: string, password: string) => {
+  return fetch(myRequest(`${USERS_SERVICE_URL}/users/login`, 'POST'), {
+    body: JSON.stringify({ email, password }),
+  })
+    .then((response) => (response.ok ? response.json() : rejectPromise(response)))
+    .catch((err) => rejectPromise(err));
+};
 
-  useEffect(() => {
-    if (userDestinationAccount) {
-      const { userId } = userDestinationAccount;
-      getUser(userId).then((user) => {
-        setUserDestination(user);
-      });
-    }
-  }, [navigate, userDestinationAccount]);
+export const createAnUser = (user: User) => {
+  if (!user.firstName || !user.lastName) {
+    return Promise.reject(new Error('Nombre y apellido obligatorios.'));
+  }
 
-  useEffect(() => {
-    if (user && user.id) {
-      getAccounts().then((accounts) => {
-        const userAccount = accounts.find(
-          (account) => account.userId === user.id
-        );
-        if (userAccount) {
-          setUserOriginAccount(userAccount);
-        }
-      });
-    }
-  }, [user]);
+  const userForBackend = {
+    NyAP: `${user.firstName} ${user.lastName}`,
+    dni: user.dni,
+    email: user.email,
+    telefono: user.phone,
+    password: user.password,
+  };
 
-  const onNavigate = useCallback(
-    (step: number) => {
-      navigate(`${ROUTES.SEND_MONEY}?${STEP}${step}`);
-    },
-    [navigate]
-  );
-
-  useEffect(() => {
-    if (step !== '1' && formState.destination === '') {
-      setTimeout(() => onNavigate(1));
-    }
-  }, [step, formState, navigate, onNavigate]);
-
-  const onChange = (
-    event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
-    maxLength?: number
-  ) => handleChange(event, setFormState, maxLength);
-
-  return <>{renderStep(formState)}</>;
-
-  function renderStep(formState: { destination: string; amount: string }) {
-    const { amount } = formState;
-    const { Argentina } = currencies;
-    const { locales, currency } = Argentina;
-    const isError = !!searchParams.get('error');
-
-    const handleClick = (
-      origin: string,
-      destination: string,
-      amount: number
-    ) => {
-      const destinationName = userDestinationAccount
-        ? userDestinationAccount.name
-        : '';
-      if (user && user.id) {
-        createTransferActivity(
-          user.id,
-          token,
-          origin,
-          destination,
-          amount,
-          destinationName
-        ).then((response) => {
-          navigate(`${ROUTES.ACTIVITY_DETAILS}?${STEP}${response.id}`);
+  return fetch(`${USERS_SERVICE_URL}/users/register`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(userForBackend),
+  })
+    .then((response) => {
+      if (!response.ok) {
+        return response.json().then(errData => {
+          return Promise.reject({
+            status: response.status,
+            statusText: response.statusText,
+            data: errData,
+            err: true,
+          });
         });
       }
-    };
+      return response.json();
+    })
+    .catch((error) => {
+      throw error;
+    });
+};
 
-    switch (step) {
-      case '1':
-        return (
-          <>
-            <FormSingle
-              name="destination"
-              title="Agregá una nueva cuenta"
-              label="CVU ó Alias"
-              type="text"
-              actionLabel="Continuar"
-              formState={formState}
-              handleChange={(
-                event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
-              ) => onChange(event)}
-              submit={() => {
-                if (formState.destination) {
-                  setDestination(formState.destination);
-                  onNavigate(2);
-                }
-              }}
-            />
-            {isError && (
-              <SnackBar
-                duration={duration}
-                message="Cuenta no encontrada"
-                type="error"
-              />
-            )}
-          </>
-        );
-      case '2':
-        return (
-          <FormSingle
-            name="amount"
-            title={`¿Cuanto quieres transferir a ${
-              userDestination && userDestination.firstName
-            } ?`}
-            label="Monto"
-            type="number"
-            actionLabel="Continuar"
-            validation={moneyValidationConfig}
-            formState={formState}
-            handleChange={(
-              event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
-            ) => onChange(event)}
-            submit={() => onNavigate(3)}
-          />
-        );
-      case '3':
-        return (
-          <>
-            <CardCustom
-              content={
-                <div className="tw-flex tw-flex-col">
-                  <div className="tw-flex tw-justify-between tw-mb-4">
-                    <p className="tw-font-bold">Revisá que está todo bien</p>
-                  </div>
-                  <div className="tw-flex tw-flex-col tw-mb-4">
-                    <div className="tw-flex tw-gap-2">
-                      <p className="">Vas a transferir</p>
-                      <Link to={`${ROUTES.SEND_MONEY}?${STEP}2`}>
-                        <Icon type="edit" />
-                      </Link>
-                    </div>
-                    <p className="tw-font-bold">
-                      {formatCurrency(locales, currency, parseFloat(amount))}
-                    </p>
-                  </div>
-                  <div className="tw-flex tw-flex-col tw-mb-4">
-                    <p className="">Para</p>
-                    <p className="tw-font-bold">
-                      {userDestination &&
-                        `${userDestination.firstName} ${userDestination.lastName}`}
-                    </p>
-                  </div>
-                  <div className="tw-flex tw-flex-col tw-mb-4">
-                    <p className="tw-font-bold">CVU: {formState.destination}</p>
-                  </div>
-                </div>
-              }
-              actions={
-                <div className="tw-flex tw-w-full tw-justify-end tw-mt-6">
-                  <Button
-                    type="submit"
-                    className="tw-h-12 tw-w-64"
-                    variant="outlined"
-                    onClick={() =>
-                      handleClick(
-                        userOriginAccount?.cvu || '',
-                        userDestinationAccount?.cvu || '',
-                        parseFloat(amount)
-                      )
-                    }
-                  >
-                    Transferir
-                  </Button>
-                </div>
-              }
-            />
-          </>
-        );
+export const getUser = (id: string): Promise<User> => {
+  return fetch(myRequest(`${USERS_SERVICE_URL}/users/${id}`, 'GET'))
+    .then((response) => (response.ok ? response.json() : rejectPromise(response)))
+    .catch((err) => rejectPromise(err));
+};
+
+export const updateUser = (
+  id: string,
+  data: any,
+  token: string
+): Promise<Response> => {
+  return fetch(myRequest(`${USERS_SERVICE_URL}/users/${id}`, 'PATCH', token), {
+    body: JSON.stringify(data),
+  })
+    .then((response) => (response.ok ? response.json() : rejectPromise(response)))
+    .catch((err) => rejectPromise(err));
+};
+
+export const createAnAccount = (data: any): Promise<Response> => {
+  const { user, accessToken } = data;
+
+  const account = {
+    balance: 0,
+    name: `${user.firstName} ${user.lastName}`,
+    userId: user.id,
+  };
+
+  return fetch(
+    myRequest(`${ACCOUNTS_SERVICE_URL}/accounts`, 'POST', accessToken),
+    {
+      body: JSON.stringify(account),
     }
-  }
-}
+  )
+    .then((response) => (response.ok ? response.json() : rejectPromise(response)))
+    .catch((err) => rejectPromise(err));
+};
+
+export const getAccount = (id: string, token: string): Promise<UserAccount> => {
+  return fetch(myRequest(`${ACCOUNTS_SERVICE_URL}/accounts/${id}`, 'GET', token))
+    .then((response) => (response.ok ? response.json() : rejectPromise(response)))
+    .catch((err) => rejectPromise(err));
+};
+
+export const getAccounts = (): Promise<UserAccount[]> => {
+  return fetch(myRequest(`${ACCOUNTS_SERVICE_URL}/accounts`, 'GET'))
+    .then((response) => (response.ok ? response.json() : rejectPromise(response)))
+    .catch((err) => rejectPromise(err));
+};
+
+export const updateAccount = (
+  id: string,
+  data: any,
+  token: string
+): Promise<Response> => {
+  return fetch(
+    myRequest(`${ACCOUNTS_SERVICE_URL}/accounts/${id}`, 'PATCH', token),
+    {
+      body: JSON.stringify(data),
+    }
+  )
+    .then((response) => (response.ok ? response.json() : rejectPromise(response)))
+    .catch((err) => rejectPromise(err));
+};
+
+export const getUserActivities = (
+  userId: string,
+  token: string
+): Promise<Transaction[]> => {
+  return fetch(
+    myRequest(`${ACCOUNTS_SERVICE_URL}/accounts/${userId}/activity`, 'GET', token)
+  )
+    .then((response) => (response.ok ? response.json() : rejectPromise(response)))
+    .catch((err) => rejectPromise(err));
+};
+
+export const getUserActivity = (
+  userId: string,
+  activityId: string,
+  token: string
+): Promise<Transaction> => {
+  return fetch(
+    myRequest(`${ACCOUNTS_SERVICE_URL}/accounts/${userId}/activity/${activityId}`, 'GET', token)
+  )
+    .then((response) => (response.ok ? response.json() : rejectPromise(response)))
+    .catch((err) => rejectPromise(err));
+};
+
+export const getUserCards = (
+  userId: string,
+  token: string
+): Promise<Card[]> => {
+  return fetch(myRequest(`${CARDS_SERVICE_URL}/cards/${userId}`, 'GET', token))
+    .then((response) => (response.ok ? response.json() : rejectPromise(response)))
+    .catch((err) => rejectPromise(err));
+};
+
+export const getUserCard = (userId: string, cardId: string): Promise<Card> => {
+  return fetch(myRequest(`${CARDS_SERVICE_URL}/cards/${userId}/${cardId}`, 'GET'))
+    .then((response) => (response.ok ? response.json() : rejectPromise(response)))
+    .catch((err) => rejectPromise(err));
+};
+
+export const deleteUserCard = (
+  userId: string,
+  cardId: string,
+  token: string
+): Promise<Response> => {
+  return fetch(
+    myRequest(`${CARDS_SERVICE_URL}/cards/${userId}/${cardId}`, 'DELETE', token)
+  )
+    .then((response) => (response.ok ? response.json() : rejectPromise(response)))
+    .catch((err) => rejectPromise(err));
+};
+
+export const createUserCard = (
+  userId: string,
+  card: any,
+  token: string
+): Promise<Response> => {
+  return fetch(myRequest(`${CARDS_SERVICE_URL}/cards/${userId}`, 'POST', token), {
+    body: JSON.stringify(card),
+  })
+    .then((response) => (response.ok ? response.json() : rejectPromise(response)))
+    .catch((err) => rejectPromise(err));
+};
+
+export const createDepositActivity = (
+  userId: string,
+  amount: number,
+  token: string
+) => {
+  const maxAmount = 30000;
+  if (amount > maxAmount) return rejectPromise();
+
+  const activity = {
+    amount,
+    type: 'Deposit',
+    description: 'Depósito con tarjeta',
+    dated: new Date(),
+  };
+
+  return fetch(
+    myRequest(`${ACCOUNTS_SERVICE_URL}/accounts/${userId}/activity`, 'POST', token),
+    {
+      body: JSON.stringify(activity),
+    }
+  )
+    .then((response) => (response.ok ? response.json() : rejectPromise(response)))
+    .catch((err) => rejectPromise(err));
+};
+
+export const createTransferActivity = (
+  userId: string,
+  token: string,
+  origin: string,
+  destination: string,
+  amount: number,
+  name?: string
+) => {
+  return fetch(
+    myRequest(`${ACCOUNTS_SERVICE_URL}/accounts/${userId}/activity`, 'POST', token),
+    {
+      body: JSON.stringify({
+        type: 'Transfer',
+        amount: amount * -1,
+        origin,
+        destination,
+        name,
+        dated: new Date(),
+      }),
+    }
+  )
+    .then((response) => (response.ok ? response.json() : rejectPromise(response)))
+    .catch((err) => rejectPromise(err));
+};

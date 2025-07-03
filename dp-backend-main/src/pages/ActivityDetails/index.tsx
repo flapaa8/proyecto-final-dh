@@ -29,13 +29,13 @@ const ActivityDetails = () => {
   const navigate = useNavigate();
   const { Argentina } = currencies;
   const { locales, currency } = Argentina;
-  const [token] = useLocalStorage('token');
+  const [token, setToken] = useLocalStorage<string>('token');
   const { logout } = useAuth();
   const { user } = useUserInfo();
 
   useEffect(() => {
     if (user && user.id) {
-      getUserActivity(user.id, activityId, token)
+      getUserActivity(user.id, activityId, token ?? '')
         .then((activity) => {
           if (activity && activity.amount && activity.type) {
             setUserActivity(activity);

@@ -2,27 +2,27 @@ version: '3.8'
 
 services:
   users-service:
-    build:
-      context: ./user-service
+    build: ./user-service
+    container_name: backend-users-service
     ports:
       - "3500:3500"
-    restart: always
+    environment:
+      - ACCOUNT_SERVICE_URL=http://backend-accounts-service:3600
+    volumes:
+      - ./user-service/data:/app/data   
 
   accounts-service:
-    build:
-      context: ./account-service
+    build: ./account-service
+    container_name: backend-accounts-service
     ports:
       - "3600:3600"
-    depends_on:
-      - users-service    # Acá estaba mal el nombre
-    restart: always
+    volumes:
+      - ./account-service/data:/app/data
 
   cards-service:
-    build:
-      context: ./cards-service
+    build: ./cards-service
+    container_name: backend-cards-service
     ports:
       - "3602:3602"
-    depends_on:
-      - accounts-service
-    restart: always
-
+    volumes:
+      - ./cards-service/data:/app/data

@@ -2,12 +2,13 @@ import fs from 'fs/promises';
 import path from 'path';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
-import fetch from 'node-fetch';  // <-- Import para hacer llamadas HTTP
+import fetch from 'node-fetch'; 
 import { generarAlias } from '../utils/generarAlias.js';
 import { generarCVU } from '../utils/generarCVU.js';
 
 const usuariosPath = path.resolve('./data/usuarios.json');
-const JWT_SECRET = 'clave_secreta_ultrasegura';
+const JWT_SECRET = process.env.JWT_SECRET || 'clave_secreta_ultrasegura';
+const ACCOUNT_SERVICE_URL = process.env.ACCOUNT_SERVICE_URL || 'http://localhost:3600';
 
 let usuarios = [];
 
@@ -29,7 +30,9 @@ export async function register({ NyAP, dni, email, telefono, password }) {
     throw error;
   }
 
-  const usuarioExistente = usuarios.find(u => u.dni === dni || u.email === email || u.telefono === telefono);
+  const usuarioExistente = usuarios.find(
+    u => u.dni === dni || u.email === email || u.telefono === telefono
+  );
   if (usuarioExistente) {
     const error = new Error('Usuario ya existe');
     error.status = 400;
@@ -52,11 +55,11 @@ export async function register({ NyAP, dni, email, telefono, password }) {
   };
 
   usuarios.push(nuevoUsuario);
-  await fs.writeFile(usuariosPath, JSON.stringify(usuarios));
+  await fs.writeFile(usuariosPath, JSON.stringify(usuarios, null, 2));
 
-  // Llamada al Account Service para crear la cuenta asociada
+  // Crear la cuenta en el Account Service
   try {
-    const response = await fetch('http://localhost:3600/accounts/create', {
+    const response = await fetch(`${ACCOUNT_SERVICE_URL}/accounts/create`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -67,13 +70,28 @@ export async function register({ NyAP, dni, email, telefono, password }) {
     });
 
     if (!response.ok) {
-      console.error('Error creando cuenta en Account Service');
+      const text = await response.text();
+      console.error('Error creando cuenta en Account Service', response.status, text);
     }
   } catch (err) {
     console.error('Error comunicándose con Account Service:', err);
   }
 
-  return { message: 'Usuario registrado', cvu, alias };
+ 
+  const accessToken = jwt.sign(
+    { id: nuevoUsuario.id, email: nuevoUsuario.email },
+    JWT_SECRET,
+    { expiresIn: '1h' }
+  );
+
+  const usuarioSinPassword = { ...nuevoUsuario };
+  delete usuarioSinPassword.contraseña;
+
+  return {
+    message: 'Usuario registrado correctamente',
+    usuario: usuarioSinPassword,
+    accessToken
+  };
 }
 
 export async function login({ email, password }) {
@@ -92,8 +110,18 @@ export async function login({ email, password }) {
   }
 
   const token = jwt.sign({ id: usuario.id }, JWT_SECRET, { expiresIn: '1h' });
-  return { message: 'Login exitoso', token };
+
+  
+  const usuarioSinPassword = { ...usuario };
+  delete usuarioSinPassword.contraseña;
+
+  return {
+    message: 'Login exitoso',
+    usuario: usuarioSinPassword,
+    accessToken: token
+  };
 }
+
 export async function transferencia(userId, { destino, monto, descripcion }) {
   const cuentaOrigen = await obtenerCuenta(userId);
 
@@ -109,7 +137,7 @@ export async function transferencia(userId, { destino, monto, descripcion }) {
     throw error;
   }
 
-  const response = await fetch(`http://localhost:3600/accounts/${cuentaOrigen.id}/transactions`, {
+  const response = await fetch(`${ACCOUNT_SERVICE_URL}/accounts/${cuentaOrigen.id}/transactions`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -129,10 +157,10 @@ export async function transferencia(userId, { destino, monto, descripcion }) {
 }
 
 async function obtenerCuenta(userId) {
-  const res = await fetch(`http://localhost:3600/accounts/user/${userId}`);
+  const res = await fetch(`${ACCOUNT_SERVICE_URL}/accounts/user/${userId}`);
   if (!res.ok) return null;
 
   const cuentas = await res.json();
-  return cuentas[0]; // asumimos una sola cuenta por usuario
+  return cuentas[0]; 
 }
 

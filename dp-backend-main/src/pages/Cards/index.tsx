@@ -61,7 +61,7 @@ const CardsComponent = () => {
   const isAdding = !!searchParams.get('add');
   const isSuccess = !!searchParams.get('success');
   const message = (searchParams.get('message') as SUCCESS_MESSAGES_KEYS) || '';
-  const [token] = useLocalStorage('token');
+  const [token, setToken] = useLocalStorage<string>('token');
   const { logout } = useAuth();
   const navigate = useNavigate();
   const { user } = useUserInfo();
@@ -69,7 +69,7 @@ const CardsComponent = () => {
   useEffect(() => {
     if (!isAdding) {
       if (user && user.id) {
-        getUserCards(user.id, token)
+        getUserCards(user.id, token ?? '')
           .then((cards) => {
             if ((cards as Card[]).length > 0) {
               const parsedRecords = (cards as Card[]).map((parsedCard: Card) =>
@@ -219,15 +219,16 @@ function CardForm() {
     transformExpiration(expiry);
     if (user && user.id) {
       createUserCard(
-        user.id,
-        {
-          expiration: expiry,
-          number,
-          name,
-          cvc,
-        },
-        token
-      )
+  user.id,
+  {
+    expiration: expiry,
+    number,
+    name,
+    cvc,
+  },
+  (token ?? '') as string   // casting para que TypeScript acepte
+)
+
         .then(() => {
           navigate(
             `${ROUTES.CARDS}?${SUCCESS}&${MESSAGE}${SUCCESS_MESSAGES_KEYS.CARD_ADDED}`

@@ -776,10 +776,6 @@ label {
   gap: 1rem;
 }
 
-#root .tw-gap-2 {
-  gap: 0.5rem;
-}
-
 #root .tw-gap-y-4 {
   row-gap: 1rem;
 }

@@ -32,7 +32,7 @@ const Dashboard = () => {
   const { locales, currency } = Argentina;
   const navigate = useNavigate();
   const { user } = useUserInfo();
-  const [token] = useLocalStorage('token');
+  const [token] = useLocalStorage<string>('token');
   const [searchParams] = useSearchParams();
   const isSuccess = !!searchParams.get('success');
   const [userActivities, setUserActivities] = useState<IRecord[]>([]);
@@ -42,10 +42,16 @@ const Dashboard = () => {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const { logout } = useAuth();
 
-  useEffect(() => {
-    if (user && user.id && typeof token === 'string') {  // Verificación de tipo
-      getUserActivities(user.id, token)
+useEffect(() => {
+    console.log("🚩 [useEffect actividades] Disparado");
+    console.log("Token en Dashboard (useEffect actividades):", token);
+    console.log("User en Dashboard (useEffect actividades):", user);
+
+    if (user && user.id && typeof token === 'string') {
+      getUserActivities(user.id, token ?? '')
         .then((activities) => {
+          console.log("✅ Actividades obtenidas:", activities);
+
           if ((activities as Transaction[]).length > 0) {
             const orderedActivities = sortByDate(activities);
             const parsedRecords = orderedActivities.map(
@@ -57,17 +63,26 @@ const Dashboard = () => {
         })
         .finally(() => setIsLoading(false))
         .catch((error) => {
+          console.error("❌ Error en getUserActivities:", error);
           if (error.status === UNAUTHORIZED) {
             logout();
           }
         });
+    } else {
+      console.warn("⚠️ No se llama a getUserActivities: user o token vacíos");
     }
-  }, [logout, token, user]);
+}, [logout, token, user]);
 
-  useEffect(() => {
-    if ((user && user.id || (user && user.id && isSuccess)) && typeof token === 'string') {  // Verificación de tipo
+useEffect(() => {
+    console.log("🚩 [useEffect getAccount] Disparado");
+    console.log("Token en Dashboard (useEffect getAccount):", token);
+    console.log("User en Dashboard (useEffect getAccount):", user);
+
+    if ((user && user.id || (user && user.id && isSuccess)) && typeof token === 'string') {
       getAccount(user.id, token)
         .then((account) => {
+          console.log("✅ Cuenta obtenida:", account);
+
           if ((account as UserAccount).balance) {
             setUserAccount({
               balance: account.balance || 0,
@@ -78,12 +93,17 @@ const Dashboard = () => {
           }
         })
         .catch((error) => {
+          console.error("❌ Error en getAccount:", error);
           if (error.status === UNAUTHORIZED) {
             logout();
           }
         });
+    } else {
+      console.warn("⚠️ No se llama a getAccount: user o token vacíos");
     }
-  }, [isSuccess, logout, navigate, token, user]);
+}, [isSuccess, logout, navigate, token, user]);
+
+
 
   return (
     <div className="tw-w-full">

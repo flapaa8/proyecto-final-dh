@@ -1,39 +1,8 @@
 [
   {
-  "id": "1748409666565",
-  "userId": "1749308880814",
-  "cvu": "8791915763578532921767",
-  "alias": "alias.generico.demo",
-  "saldo": 1000,
-  "transacciones": [
-    {
-      "id": "1",
-      "tipo": "retiro",
-      "monto": 500,
-      "descripcion": "Transferencia de prueba",
-      "fecha": "2025-06-08T04:15:11.718Z"
-    },
-    {
-      "id": "2",
-      "tipo": "transferencia",
-      "monto": 500,
-      "descripcion": "Transferencia de prueba",
-      "fecha": "2025-06-08T04:15:11.718Z"
-    }
-  ]
-}
-,
-  {
-    "userId": "1748582084513",
-    "cvu": "1234567890123456789012",
-    "alias": "nuevo.alias.demo",
-    "saldo": 0,
-    "transacciones": []
-  },
-  {
-    "userId": "1748582084514",
-    "cvu": "1234567890123456789013",
-    "alias": "nuevo.alias.demo2",
+    "userId": "1751406020791",
+    "cvu": "6224012204972731391635",
+    "alias": "alias.generico.demo",
     "saldo": 0,
     "transacciones": []
   }

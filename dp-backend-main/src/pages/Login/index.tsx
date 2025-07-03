@@ -19,7 +19,8 @@ import {
 import { ErrorMessage, Errors } from '../../components/ErrorMessage';
 import { useAuth, useLocalStorage } from '../../hooks';
 import { SnackBar } from '../../components';
-import { BAD_REQUEST, ERROR_MESSAGES } from '../../constants';
+import { BAD_REQUEST, ERROR_MESSAGES, ROUTES } from '../../constants';
+import { useNavigate } from 'react-router-dom';
 
 interface LoginState {
   email: string;
@@ -43,8 +44,7 @@ const Login = () => {
     criteriaMode: 'all',
   });
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [token, setToken] = useLocalStorage('token');
+  const [token, setToken] = useLocalStorage<string>('token');
   const [values, setValues] = useState<LoginState>({
     email: '',
     password: '',
@@ -54,6 +54,7 @@ const Login = () => {
   const [isError, setIsError] = useState<boolean>(false);
   const [isSubmiting, setIsSubmiting] = useState<boolean>(false);
   const [message, setMessage] = useState<string>('');
+  const navigate = useNavigate();
 
   const isEmpty = isValueEmpty(values);
   const hasErrors = useMemo(() => valuesHaveErrors(errors), [errors]);
@@ -80,21 +81,26 @@ const Login = () => {
     setIsSubmiting(true);
     login(email, password)
       .then((response) => {
-        console.log("Respuesta del login:", response);
-        setToken(response.token); 
-
-        setTimeout(() => {
-          setIsSubmiting(false);
+        console.log("✅ Respuesta del login:", response);
+        if (response.accessToken) {
+          setToken(response.accessToken); // 👈 Guarda correctamente el token
           setIsAuthenticated(true);
-        }, 1000);
+          navigate(ROUTES.HOME); // 👈 Navega al Dashboard
+        } else {
+          console.error("❌ No se recibió accessToken en la respuesta", response);
+          setMessage(ERROR_MESSAGES.NOT_FOUND_USER);
+          setIsError(true);
+        }
       })
       .catch((error) => {
-        console.error(error);
-        setIsSubmiting(false);
+        console.error("❌ Error en login:", error);
         setMessage(ERROR_MESSAGES.NOT_FOUND_USER);
         if (error.status === BAD_REQUEST) {
           setIsError(true);
         }
+      })
+      .finally(() => {
+        setIsSubmiting(false);
       });
   };
 
@@ -112,7 +118,7 @@ const Login = () => {
       >
         <div>
           <FormControl variant="outlined">
-            <InputLabel htmlFor="outlined-adornment-password">Correo</InputLabel>
+            <InputLabel htmlFor="outlined-adornment-email">Correo</InputLabel>
             <OutlinedInput
               id="outlined-adornment-email"
               type="text"
@@ -180,3 +186,4 @@ const Login = () => {
 };
 
 export default Login;
+

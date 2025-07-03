@@ -25,7 +25,8 @@ const recordsPerPage = 10;
 const Activity = () => {
   const [userActivities, setUserActivities] = useState<IRecord[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [token] = useLocalStorage('token');
+  const [token, setToken] = useLocalStorage<string>('token');
+
 
   const { pageNumber, numberOfPages, isRecordsGreeterThanOnePage } =
     usePagination(userActivities as IRecord[], recordsPerPage);
@@ -35,7 +36,7 @@ const Activity = () => {
 
   useEffect(() => {
     if (user && user.id) {
-      getUserActivities(user.id, token)
+      getUserActivities(user.id, token ?? '')
         .then((activities) => {
           if ((activities as Transaction[]).length > 0) {
             const orderedActivities = sortByDate(activities);

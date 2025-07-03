@@ -3,7 +3,6 @@ import path from 'path';
 import axios from 'axios';
 
 const cuentasPath = path.resolve('./data/cuentas.json');
-
 let cuentas = [];
 
 async function cargarCuentas() {
@@ -17,20 +16,17 @@ async function cargarCuentas() {
 
 await cargarCuentas();
 
+// Crear cuenta
 export async function crearCuentaService({ userId, cvu, alias }) {
   try {
-    const response = await axios.get(`http://localhost:3500/users/${userId}`);
-    if (!response.data) {
-      throw new Error('Usuario no encontrado');
-    }
-  } catch (err) {
+    const response = await axios.get(`http://backend-users-service:3500/users/${userId}`);
+    if (!response.data) throw new Error('Usuario no encontrado');
+  } catch {
     throw new Error('Usuario no encontrado');
   }
 
   const cuentaExistente = cuentas.find(c => c.cvu === cvu || c.alias === alias);
-  if (cuentaExistente) {
-    throw new Error('CVU o alias ya existente');
-  }
+  if (cuentaExistente) throw new Error('CVU o alias ya existente');
 
   const nuevaCuenta = { userId, cvu, alias, saldo: 0, transacciones: [] };
   cuentas.push(nuevaCuenta);
@@ -38,17 +34,24 @@ export async function crearCuentaService({ userId, cvu, alias }) {
   await fs.writeFile(cuentasPath, JSON.stringify(cuentas, null, 2));
 }
 
-// Obtener cuentas de un usuario
+// Obtener cuentas por usuario
 export async function obtenerCuentasPorUsuarioService(userId) {
   await cargarCuentas();
   const resultado = cuentas.filter(cuenta => String(cuenta.userId) === String(userId));
-  if (resultado.length === 0) {
-    throw new Error('No se encontraron cuentas para ese usuario');
-  }
+  if (resultado.length === 0) throw new Error('No se encontraron cuentas para ese usuario');
   return resultado;
 }
 
-// Agregar una transacción a una cuenta
+// Obtener actividades por usuario
+export async function obtenerActividadesPorUsuarioService(userId) {
+  await cargarCuentas();
+  const cuentasUsuario = cuentas.filter(c => String(c.userId) === String(userId));
+  if (cuentasUsuario.length === 0) throw new Error('No se encontraron cuentas para este usuario');
+  const actividades = cuentasUsuario.flatMap(cuenta => cuenta.transacciones || []);
+  return actividades;
+}
+
+// Agregar transacción
 export async function agregarTransaccionService(cuentaId, transaccion) {
   await cargarCuentas();
   const cuenta = cuentas.find(c => c.cvu === cuentaId || c.alias === cuentaId || c.id === cuentaId);
@@ -56,10 +59,8 @@ export async function agregarTransaccionService(cuentaId, transaccion) {
 
   transaccion.id = (cuenta.transacciones.length + 1).toString();
   transaccion.fecha = new Date().toISOString();
-
   cuenta.transacciones.push(transaccion);
 
-  // Actualizar saldo según tipo
   if (transaccion.tipo === 'depósito' || transaccion.tipo === 'transferencia') {
     cuenta.saldo += transaccion.monto;
   } else if (transaccion.tipo === 'retiro') {
@@ -70,7 +71,7 @@ export async function agregarTransaccionService(cuentaId, transaccion) {
   return transaccion;
 }
 
-// Obtener transacciones de una cuenta
+// Obtener transacciones
 export async function obtenerTransaccionesService(cuentaId) {
   await cargarCuentas();
   const cuenta = cuentas.find(c => c.cvu === cuentaId || c.alias === cuentaId || c.id === cuentaId);
@@ -78,6 +79,7 @@ export async function obtenerTransaccionesService(cuentaId) {
   return cuenta.transacciones;
 }
 
+// Transferir fondos
 export async function transferirFondosService({ cuentaOrigenId, destino, monto, descripcion }) {
   await cargarCuentas();
 
@@ -86,20 +88,16 @@ export async function transferirFondosService({ cuentaOrigenId, destino, monto, 
   );
   if (!cuentaOrigen) throw new Error('Cuenta de origen no encontrada');
 
-  const cuentaDestino = cuentas.find(c =>
-    c.cvu === destino || c.alias === destino
-  );
+  const cuentaDestino = cuentas.find(c => c.cvu === destino || c.alias === destino);
   if (!cuentaDestino) throw new Error('Cuenta de destino no encontrada');
 
   if (cuentaOrigen.saldo < monto) throw new Error('Fondos insuficientes');
 
   const fecha = new Date().toISOString();
 
-  // Actualizar saldos
   cuentaOrigen.saldo -= monto;
   cuentaDestino.saldo += monto;
 
-  // Agregar transacción a cuenta origen
   cuentaOrigen.transacciones.push({
     id: (cuentaOrigen.transacciones.length + 1).toString(),
     tipo: 'retiro',
@@ -108,7 +106,6 @@ export async function transferirFondosService({ cuentaOrigenId, destino, monto, 
     fecha
   });
 
-  // Agregar transacción a cuenta destino
   cuentaDestino.transacciones.push({
     id: (cuentaDestino.transacciones.length + 1).toString(),
     tipo: 'transferencia',
@@ -124,3 +121,4 @@ export async function transferirFondosService({ cuentaOrigenId, destino, monto, 
     destino: cuentaDestino.alias || cuentaDestino.cvu
   };
 }
+

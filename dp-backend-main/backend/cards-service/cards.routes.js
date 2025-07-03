@@ -5,7 +5,7 @@ import {
   crearTarjeta,
   editarTarjeta,
   eliminarTarjeta,
-} from './controllers/cards.controller.js'; // <--- sin ../, está en subcarpeta controllers
+} from './controllers/cards.controller.js';
 
 const router = express.Router();
 

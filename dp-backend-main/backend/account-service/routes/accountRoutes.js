@@ -2,25 +2,37 @@ import express from 'express';
 import {
   crearCuentaController,
   obtenerCuentasPorUsuarioController,
+  obtenerActividadesPorUsuarioController, 
   agregarTransaccionController,
   obtenerTransaccionesController,
-  transferirFondosController // 👈 nuevo
+  transferirFondosController
 } from '../controllers/accountControllers.js';
+
+import { validarToken } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
+// Crear cuenta
 router.post('/create', crearCuentaController);
 
-router.get('/user/:userId', obtenerCuentasPorUsuarioController);
+// Obtener cuentas por usuario
+router.get('/user/:userId', validarToken, obtenerCuentasPorUsuarioController);
 
-router.post('/:cuentaId/transactions', agregarTransaccionController);
+// Obtener actividades por usuario
+router.get('/:userId/activity', validarToken, obtenerActividadesPorUsuarioController);
 
-router.get('/:cuentaId/transactions', obtenerTransaccionesController);
+// Agregar transacción a una cuenta
+router.post('/:cuentaId/transactions', validarToken, agregarTransaccionController);
 
-// NUEVO ENDPOINT 👇
-router.post('/:cuentaId/transferences', transferirFondosController);
+// Obtener transacciones de una cuenta
+router.get('/:cuentaId/transactions', validarToken, obtenerTransaccionesController);
+
+// Transferir fondos entre cuentas
+router.post('/:cuentaId/transferences', validarToken, transferirFondosController);
 
 export default router;
+
+
 
 
 
